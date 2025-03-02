@@ -11,16 +11,14 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # ✅ Ensure Flask uses the correct Google Cloud service account key
-SERVICE_ACCOUNT_KEY_PATH = "C:/pythonscriptsgpt/gcp-key.json"
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_KEY_PATH
+SERVICE_ACCOUNT_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not SERVICE_ACCOUNT_KEY_PATH:
+    raise FileNotFoundError("Service account key file path not found!")
 
-# ✅ Read OpenAI API Key from File
-OPENAI_KEY_PATH = "C:/pythonscriptsgpt/chatgptapikey.txt"
-if not os.path.exists(OPENAI_KEY_PATH):
-    raise FileNotFoundError(f"OpenAI API key file not found: {OPENAI_KEY_PATH}")
-
-with open(OPENAI_KEY_PATH, "r") as file:
-    OPENAI_API_KEY = file.read().strip()
+# ✅ Read OpenAI API Key from Environment Variable
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OpenAI API key is missing! Set OPENAI_API_KEY in environment variables.")
 
 # ✅ Google Cloud Storage setup
 BUCKET_NAME = "construction_ai"
@@ -51,7 +49,6 @@ def generate_signed_url():
         version="v4"
     )
 
-    print(f"Generated Signed URL for Upload: {signed_url}")
     return jsonify({"signed_url": signed_url})
 
 # ✅ 2️⃣ AI Home Inspector - Use GPT-4o Vision API for Image Analysis
