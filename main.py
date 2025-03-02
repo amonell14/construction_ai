@@ -3,12 +3,19 @@ from flask import Flask, request, jsonify
 from google.cloud import storage
 import datetime
 import openai
-from flask_cors import CORS  # ✅ Import CORS
+from flask_cors import CORS
 
 app = Flask(__name__)
 
-# ✅ Enable CORS for all domains (including Framer)
-CORS(app, resources={r"/*": {"origins": "*"}})
+# ✅ Force CORS for all responses
+CORS(app)
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
 
 # ✅ Ensure Flask uses the correct Google Cloud service account key
 SERVICE_ACCOUNT_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
