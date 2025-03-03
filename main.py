@@ -7,12 +7,24 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# ✅ Force CORS for all responses
-CORS(app)
+# ✅ Restrict CORS to Specific Domains (Replace with Your Framer URL)
+ALLOWED_ORIGINS = ["https://your-framer-project-url.com", "http://localhost:3000"]
+CORS(app, resources={r"/*": {"origins": ALLOWED_ORIGINS}})
 
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    """Add CORS headers to all responses."""
+    response.headers["Access-Control-Allow-Origin"] = ", ".join(ALLOWED_ORIGINS)
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
+
+@app.route('/upload', methods=['OPTIONS'])
+@app.route('/chat', methods=['OPTIONS'])
+def handle_options():
+    """Handle CORS preflight requests."""
+    response = jsonify({"message": "CORS preflight successful"})
+    response.headers["Access-Control-Allow-Origin"] = ", ".join(ALLOWED_ORIGINS)
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
@@ -40,52 +52,60 @@ def home():
 @app.route('/upload', methods=['POST'])
 def generate_signed_url():
     """Generates a signed URL for image uploads using V4 signing."""
-    data = request.get_json()
-    file_name = data.get("file_name")
+    try:
+        data = request.get_json()
+        file_name = data.get("file_name")
 
-    if not file_name:
-        return jsonify({"error": "Missing file_name"}), 400
+        if not file_name:
+            return jsonify({"error": "Missing file_name"}), 400
 
-    bucket = storage_client.bucket(BUCKET_NAME)
-    blob = bucket.blob(f"uploads/{file_name}")
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(f"uploads/{file_name}")
 
-    expiration = datetime.timedelta(minutes=30)
-    signed_url = blob.generate_signed_url(
-        expiration=expiration,
-        method="PUT",
-        version="v4"
-    )
+        expiration = datetime.timedelta(minutes=30)
+        signed_url = blob.generate_signed_url(
+            expiration=expiration,
+            method="PUT",
+            version="v4"
+        )
 
-    return jsonify({"signed_url": signed_url})
+        return jsonify({"signed_url": signed_url})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ✅ 2️⃣ AI Home Inspector - Use GPT-4o Vision API for Image Analysis
 @app.route('/chat', methods=['POST'])
 def analyze_image():
     """Sends the uploaded image URL to GPT-4o for AI vision analysis."""
-    data = request.get_json()
-    image_url = data.get("image_url")
+    try:
+        data = request.get_json()
+        image_url = data.get("image_url")
 
-    if not image_url:
-        return jsonify({"error": "Missing image_url"}), 400
+        if not image_url:
+            return jsonify({"error": "Missing image_url"}), 400
 
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a professional home inspector with expertise in damage assessment."},
-            {"role": "user", "content": [
-                {"type": "text", "text": "Analyze the damage in this image and provide the following:\n"
-                    "- Description of the visible damage\n"
-                    "- Possible causes of the issue\n"
-                    "- Repair recommendations with cost estimates"},
-                {"type": "image_url", "image_url": {"url": image_url}}
-            ]}
-        ],
-        max_tokens=500
-    )
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a professional home inspector with expertise in damage assessment."},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Analyze the damage in this image and provide the following:\n"
+                        "- Description of the visible damage\n"
+                        "- Possible causes of the issue\n"
+                        "- Repair recommendations with cost estimates"},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ],
+            max_tokens=500
+        )
 
-    return jsonify({"response": response.choices[0].message.content})
+        return jsonify({"response": response.choices[0].message.content})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ✅ Fix: Ensure Flask Listens on All Addresses
 if __name__ == "__main__":
